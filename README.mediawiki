@@ -1,0 +1,85 @@
+== Headline ==
+
+Employ a column-oriented database
+
+== Motivation ==
+
+In this implementation, the features of a [[Technology:Column-oriented database]] by example of [[Technology:HBase]]. It employs the column-wise ordering of data to accomplish data operations. The query language used is [[Language:Ruby|JRuby]].
+
+== Technologies ==
+
+* [[Technology:HBase]]
+* [[Technology:Data aggregation]]
+
+== Languages ==
+
+* [[Language:Ruby]]
+
+== Features ==
+
+* [[101feature:Tree structure]]
+
+* [[101feature:Type-driven query]]
+
+* [[101feature:Type-driven transformation]]
+
+== Illustration ==
+
+A company is organized in two tables, one for employees and one for departments.
+
+The employees table contains two column families: personal and corporate. The personal column family contains name and address columns, while the corporate family contains a salary column.
+
+In the departments table there are two column families for personnel and corporate structure. Under personnel, employee and manager columns are maintained while the structure family contains a column for information on subdepartments.
+
+Totalling employee salaries is implemented in a JRuby script that is executed by the HBase shell using a few helper classes from HBase's [[Language:Java]] library. First, the script establishes an access object to the employees table:
+
+<syntaxhighlight lang="ruby">
+employees = HTable.new(@hbase.configuration, "meganalysis_employees")
+</syntaxhighlight>
+
+Then, a cursor on the table is obtained via a Scanner object. The scanner is iterated over and for each entry, the salary value is extracted and added to the total. Because the database just stores raw byte arrays, the stored value first has to be converted back into a floating point number which is taken care of by an HBase helper class.
+
+<syntaxhighlight lang="ruby">
+total = 0.0
+while (result = scanner.next())
+  id = Bytes.toString(result.getRow())
+  name = Bytes.toString(result.getValue(*jbytes('personal', 'name')))
+  salary = Bytes.toDouble(result.getValue( *jbytes('corporate', 'salary')))
+
+  print "ID: #{id}, Name: #{name}, Salary: #{salary}\n"
+  total += salary
+end
+</syntaxhighlight>
+
+Cutting salaries is implemented similarily although rather than totalling the extracted salary, the new value is written back into the table by creating and submitting a proper put request.
+
+<syntaxhighlight lang="ruby">
+  put_cut = Put.new(namebytes)
+  put_cut.add( *(jbytes('corporate', 'salary') << Bytes.toBytes(salary / 2.0)))
+  employees.put(put_cut) if put_cut
+</syntaxhighlight>
+
+== Usage ==
+
+In the dbs subfolder are two HBase database dumps. Make sure to have a local installation of HBase running and execute
+
+<syntaxhighlight lang="bash">
+$ ./rebuild.sh
+</syntaxhighlight>
+
+This will restore the employee and department tables for the meganalysis company.
+
+The feature demonstrations are executed using the HBase shell. Simply run
+
+<syntaxhighlight lang="bash">
+$ ./total.sh # or cut.sh
+</syntaxhighlight>.
+
+The scripts will drop into the HBase shell which can be quit by simply typing 'quit'.
+
+== Contributors ==
+
+* {{101contributor|Sebastian Jackel|developer}}
+
+[[Category:101implementation]]
+[[Category:NoSQL theme]]
